@@ -10,12 +10,14 @@ This CLI shares crawling and conversion logic with ``site2pdf_core``.
 
 import argparse
 import sys
+import urllib.parse
 
 from site2pdf_core import (
     normalize_url,
     fetch,
     extract_links_from_sitemap,
     crawl_and_output,
+    discover_sitemap_url,
 )
 
 
@@ -24,8 +26,8 @@ def main():
         description="Crawl all links in a sitemap.xml and build Markdown+PDF"
     )
     ap.add_argument(
-        "sitemap_url",
-        help="URL to sitemap.xml (e.g. https://example.com/sitemap.xml)",
+        "url",
+        help="Website root or sitemap.xml URL (e.g. https://example.com)",
     )
     ap.add_argument(
         "--delay", type=float, default=0.35, help="Delay between page fetches (seconds)"
@@ -38,7 +40,18 @@ def main():
     )
     args = ap.parse_args()
 
-    sitemap_url = normalize_url(args.sitemap_url)
+    raw_url = normalize_url(args.url)
+    if raw_url.lower().endswith(".xml"):
+        sitemap_url = raw_url
+        p = urllib.parse.urlparse(sitemap_url)
+        base_url = f"{p.scheme}://{p.netloc}"
+    else:
+        base_url = raw_url.rstrip("/")
+        try:
+            sitemap_url = discover_sitemap_url(base_url)
+        except RuntimeError as e:
+            print(f"[-] {e}", file=sys.stderr)
+            sys.exit(2)
 
     print(f"[+] Fetching sitemap: {sitemap_url}")
     status, content, _ = fetch(sitemap_url)
@@ -51,7 +64,7 @@ def main():
         links = links[:args.limit]
     print(f"[+] Found {len(links)} link(s) in sitemap.")
 
-    crawl_and_output(sitemap_url, links, args.delay)
+    crawl_and_output(base_url, links, args.delay)
 
 
 if __name__ == "__main__":
