@@ -8,6 +8,4 @@ pip3 install -r requirements.txt
 
 ## Running the scripts
 
-python3 linksInSitemap2pdf.py https://invertedpassion.com/ --limit 10
-
-python3 linksOnPage2pdf.py https://invertedpassion.com --same-origin
+python3 linksOnPage2pdf.py https://example.com --same-origin
