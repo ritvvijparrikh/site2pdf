@@ -96,6 +96,35 @@ def make_output_stem(page_url: str) -> str:
     path = p.path.strip("/").replace("/", "_") or "index"
     return f"{netloc}_{path}"
 
+def discover_sitemap_url(base_url: str) -> str:
+    """Best-effort discovery of a site's sitemap.xml URL.
+
+    Tries ``<base>/sitemap.xml`` first, then looks for ``Sitemap:`` lines
+    inside ``robots.txt``. Returns the first URL that responds with XML
+    content. Raises ``RuntimeError`` if none found.
+    """
+
+    base = normalize_url(base_url).rstrip("/")
+
+    candidate = base + "/sitemap.xml"
+    status, _, ctype = fetch(candidate)
+    if status == 200 and "xml" in (ctype or "").lower():
+        return candidate
+
+    robots_url = base + "/robots.txt"
+    status, content, _ = fetch(robots_url)
+    if status == 200 and content:
+        text = content.decode("utf-8", errors="ignore")
+        for line in text.splitlines():
+            if line.lower().startswith("sitemap:"):
+                sitemap_url = line.split(":", 1)[1].strip()
+                if sitemap_url:
+                    status, _, ctype = fetch(sitemap_url)
+                    if status == 200 and "xml" in (ctype or "").lower():
+                        return sitemap_url
+
+    raise RuntimeError("Sitemap URL not found")
+
 # ----------------------------
 # Link extraction
 # ----------------------------
@@ -119,14 +148,32 @@ def extract_links_from_page(page_url: str, html_bytes: bytes, only_same_origin: 
 
     return sorted(links)
 
-def extract_links_from_sitemap(xml_bytes: bytes) -> List[str]:
-    """Parse sitemap XML and return list of URLs from <loc> tags."""
+def extract_links_from_sitemap(xml_bytes: bytes, _visited: Set[str] | None = None) -> List[str]:
+    """Parse sitemap XML (recursively) and return list of URLs from ``<loc>`` tags."""
+
     soup = BeautifulSoup(xml_bytes, "xml")
+    if _visited is None:
+        _visited = set()
+
+    root = soup.find()
     links: List[str] = []
+
+    if root and root.name and root.name.lower() == "sitemapindex":
+        for loc in root.find_all("loc"):
+            url = loc.get_text(strip=True)
+            if not url or url in _visited:
+                continue
+            _visited.add(url)
+            status, content, ctype = fetch(url)
+            if status == 200 and "xml" in (ctype or "").lower():
+                links.extend(extract_links_from_sitemap(content, _visited))
+        return sorted({strip_fragment(u) for u in links})
+
     for loc in soup.find_all("loc"):
         url = loc.get_text(strip=True)
         if url:
             links.append(url)
+
     return sorted({strip_fragment(u) for u in links})
 
 # ----------------------------

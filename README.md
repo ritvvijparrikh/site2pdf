@@ -12,4 +12,8 @@ pip3 install -r requirements.txt
 python3 linksOnPage2pdf.py https://example.com --same-origin
 
 # Crawl links listed in a sitemap.xml
+# Pass a sitemap.xml directly
 python3 linksInSitemap2pdf.py https://example.com/sitemap.xml
+
+# Or let the script discover the sitemap from the site's root
+python3 linksInSitemap2pdf.py https://example.com
