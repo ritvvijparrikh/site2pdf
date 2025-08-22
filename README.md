@@ -8,4 +8,8 @@ pip3 install -r requirements.txt
 
 ## Running the scripts
 
+# Crawl links found directly on a page
 python3 linksOnPage2pdf.py https://example.com --same-origin
+
+# Crawl links listed in a sitemap.xml
+python3 linksInSitemap2pdf.py https://example.com/sitemap.xml
